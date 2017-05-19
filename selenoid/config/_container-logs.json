@@ -1,0 +1,7 @@
+{
+    "Type" : "syslog",
+    "Config" : {
+      "syslog-address" : "tcp://172.17.0.1:5000",
+      "tag": "{{.ImageName}}/{{.Name}}/{{.ID}}"
+    }
+}

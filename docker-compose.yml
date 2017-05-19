@@ -1,0 +1,121 @@
+version: '3'
+
+services:
+
+  selenoid:
+    image: aerokube/selenoid:1.2.1
+    restart: on-failure
+    command: "-limit 20 -timeout 5m0s"
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://${LOGSTASH_HOST}:5000"
+        tag: "{{.ImageName}}/{{.Name}}/{{.ID}}"
+    network_mode: "bridge"
+    ports:
+      - 4444:4444
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "$PWD/selenoid:/etc/selenoid:ro"
+    links:
+      - logstash:logstash
+    depends_on:
+      - logstash
+
+  selenoid_ui:
+    image: aerokube/selenoid-ui:1.2.0
+    command: "--selenoid-uri http://${SELENOID_HOST}:4444/"
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://${LOGSTASH_HOST}:5000"
+        tag: "{{.ImageName}}/{{.Name}}/{{.ID}}"
+    network_mode: "bridge"
+    ports:
+      - 8080:8080
+    links:
+      - selenoid:selenoid
+      - logstash:logstash
+    depends_on:
+      - logstash
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.4.0
+    volumes:
+      - "$PWD/elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml"
+    network_mode: "bridge"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:5.4.0
+    domainname: qa
+    hostname: logstash
+    volumes:
+      - "$PWD/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml"
+      - "$PWD/logstash/pipeline:/usr/share/logstash/pipeline"
+    network_mode: "bridge"
+    ports:
+      - "5000:5000"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    links:
+      - elasticsearch:elasticsearch
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:5.4.0
+    volumes:
+      - "$PWD/kibana/config/:/usr/share/kibana/config"
+    network_mode: "bridge"
+    ports:
+      - "5601:5601"
+    links:
+      - elasticsearch:elasticsearch
+    depends_on:
+      - elasticsearch
+
+  telegraf:
+    image: telegraf
+    #network_mode: "host"
+    network_mode: "bridge"
+    environment:
+      HOST_PROC: /rootfs/proc
+      HOST_SYS: /rootfs/sys
+      HOST_ETC: /rootfs/etc
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "$PWD/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro"
+      - /sys:/rootfs/sys:ro
+      - /proc:/rootfs/proc:ro
+      - /etc:/rootfs/etc:ro
+    links:
+      - selenoid:selenoid
+      - elasticsearch:elasticsearch
+      - influxdb:influxdb
+    labels:
+      - "traefik.enable=false"
+
+  influxdb:
+    image: influxdb
+    network_mode: "bridge"
+    ports:
+      - "8086:8086"
+    volumes:
+      - "$PWD/influxdb:/var/lib/influxdb"
+    labels:
+      - "traefik.enable=false"
+ 
+  grafana:
+    image: grafana/grafana
+    network_mode: "bridge"
+    ports:
+      - "3000:3000"
+    links:
+      - influxdb:influxdb
+    volumes:
+      - "$PWD/grafana:/var/lib/grafana"
