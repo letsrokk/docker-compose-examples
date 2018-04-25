@@ -1,5 +1,9 @@
 version: '3'
 
+volumes:
+  elasticsearch:
+    driver: local
+
 services:
 
   selenoid:
@@ -40,23 +44,25 @@ services:
       - logstash
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.4.0
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.4
     volumes:
       - "$PWD/elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml"
+      - elasticsearch:/usr/share/elasticsearch/data:rw
     network_mode: "bridge"
     ports:
       - "9200:9200"
       - "9300:9300"
     environment:
-      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      ES_JAVA_OPTS: "-Xmx1024m -Xms512m"
 
   logstash:
-    image: docker.elastic.co/logstash/logstash:5.4.0
+    image:  letsrokk/logstash-oss-plugins:latest
     domainname: qa
     hostname: logstash
     volumes:
       - "$PWD/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml"
       - "$PWD/logstash/pipeline:/usr/share/logstash/pipeline"
+      - "$PWD/logstash/jms:/opt/jms"
     network_mode: "bridge"
     ports:
       - "5000:5000"
@@ -68,7 +74,7 @@ services:
       - elasticsearch
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:5.4.0
+    image: docker.elastic.co/kibana/kibana-oss:6.2.4
     volumes:
       - "$PWD/kibana/config/:/usr/share/kibana/config"
     network_mode: "bridge"

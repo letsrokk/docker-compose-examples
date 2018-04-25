@@ -1,0 +1,7 @@
+activemq:
+  :factory: org.apache.activemq.ActiveMQConnectionFactory
+  :broker_url: tcp://localhost:61616
+  #:username: system
+  #:password: manager
+  :require_jars:
+    - /opt/jms/libs/activemq-all-5.15.3.jar
